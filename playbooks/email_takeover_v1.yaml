@@ -1,0 +1,71 @@
+id: email_takeover_v1
+description: Contain a compromised Gmail account and harden it.
+severity: high
+tags: [email, compromise]
+
+tasks:
+  proof_of_control:
+    type: ProofOfControl
+    inputs:
+      account_email: "{{target_email}}"
+    needs: []
+    approval_required: false
+    idempotency_key: "proof-{{target_email}}"
+
+  evidence_snapshot:
+    type: EvidenceSnapshot
+    inputs:
+      case_id: "{{case_id}}"
+      local_path: "/tmp/{{target_email}}_headers.json"
+      kind: "log"
+    needs: [proof_of_control]
+    approval_required: false
+    idempotency_key: "snapshot-{{target_email}}"
+
+  list_filters:
+    type: ListFilters
+    inputs:
+      user_email: "{{target_email}}"
+    needs: [proof_of_control]
+    approval_required: false
+
+  delete_suspicious_filters:
+    type: DeleteFilter
+    inputs:
+      user_email: "{{target_email}}"
+      filter_ids: "{{list_filters.output.suspicious_ids}}"
+    needs: [list_filters]
+    approval_required: true
+    idempotency_key: "del-filters-{{target_email}}"
+
+  rotate_password:
+    type: RotatePassword
+    inputs:
+      user_email: "{{target_email}}"
+      new_password_enc: "{{new_password_enc}}"
+    needs: [proof_of_control]
+    approval_required: true
+    idempotency_key: "pwd-{{target_email}}"
+
+  enroll_2fa:
+    type: Enroll2FA
+    inputs:
+      user_email: "{{target_email}}"
+    needs: [rotate_password]
+    approval_required: true
+    idempotency_key: "2fa-{{target_email}}"
+
+  revoke_oauth:
+    type: RevokeOAuthTokens
+    inputs:
+      user_id: "{{list_filters.output.user_id}}"
+    needs: [rotate_password]
+    approval_required: false
+    idempotency_key: "revoke-{{target_email}}"
+
+  hardening_coach:
+    type: HardeningCoach
+    inputs:
+      user_email: "{{target_email}}"
+    needs: [enroll_2fa, revoke_oauth]
+    approval_required: false
