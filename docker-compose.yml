@@ -1,0 +1,247 @@
+version: '3.8'
+
+# ============================================================================
+# AI SOC Multi-Agent Framework - Docker Compose Configuration
+# ============================================================================
+# This compose file orchestrates all critical services:
+# - PostgreSQL: Main database for alerts, telemetry, and quota updates
+# - Redis: Fast cache and message broker
+# - Kafka & Zookeeper: Event streaming platform
+# - MinIO: S3-compatible object storage for artifacts and models
+# - Vault: Secrets management (optional, can be replaced with external Vault)
+# - AI SOC Service: FastAPI microservice for security operations
+# - Frontend/API: Nginx-based frontend with API gateway
+# ============================================================================
+
+services:
+  # ==========================================================================
+  # Database Services
+  # ==========================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: ai-soc-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-aisoc}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-aisoc}
+      POSTGRES_INITDB_ARGS: "-E UTF8 --locale=C"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./certs/server-cert.pem:/var/lib/postgresql/server.crt:ro
+      - ./certs/server-key.pem:/var/lib/postgresql/server.key:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-aisoc}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ai-soc-network
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: ai-soc-redis
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-}
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ai-soc-network
+    restart: unless-stopped
+
+  # ==========================================================================
+  # Event Streaming Platform
+  # ==========================================================================
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: ai-soc-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_LOG4J_ROOT_LOGLEVEL: WARN
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+      - zookeeper_logs:/var/lib/zookeeper/log
+    networks:
+      - ai-soc-network
+    restart: unless-stopped
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: ai-soc-kafka
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_LOG4J_ROOT_LOGLEVEL: WARN
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    ports:
+      - "29092:29092"
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - ai-soc-network
+    restart: unless-stopped
+
+  # ==========================================================================
+  # Object Storage
+  # ==========================================================================
+  minio:
+    image: minio/minio:latest
+    container_name: ai-soc-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio_data:/data
+      - ./certs/server-cert.pem:/root/.minio/certs/public.crt:ro
+      - ./certs/server-key.pem:/root/.minio/certs/private.key:ro
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - ai-soc-network
+    restart: unless-stopped
+
+  # ==========================================================================
+  # Secrets Management
+  # ==========================================================================
+  vault:
+    image: hashicorp/vault:1.15
+    container_name: ai-soc-vault
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: ${VAULT_TOKEN}
+      VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+      VAULT_ADDR: http://0.0.0.0:8200
+    cap_add:
+      - IPC_LOCK
+    volumes:
+      - vault_data:/vault/data
+      - vault_logs:/vault/logs
+      - ./certs:/vault/certs:ro
+    ports:
+      - "8200:8200"
+    healthcheck:
+      test: ["CMD", "vault", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    networks:
+      - ai-soc-network
+    restart: unless-stopped
+    command: server -dev -dev-root-token-id=${VAULT_TOKEN}
+
+  # ==========================================================================
+  # Application Services
+  # ==========================================================================
+  ai-soc:
+    build:
+      context: ./ai_soc
+      dockerfile: Dockerfile
+    container_name: ai-soc-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      AI_SOC_SERVICE_NAME: ${AI_SOC_SERVICE_NAME:-ai-soc}
+      AI_SOC_KAFKA_BOOTSTRAP_SERVERS: ${AI_SOC_KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
+      AI_SOC_KAFKA_GROUP_ID: ${AI_SOC_KAFKA_GROUP_ID:-ai-soc}
+      AI_SOC_ALERTS_TOPIC: ${AI_SOC_ALERTS_TOPIC:-rbp.alerts}
+      AI_SOC_QUOTA_UPDATES_TOPIC: ${AI_SOC_QUOTA_UPDATES_TOPIC:-rbp.quota_updates}
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    volumes:
+      - ./secrets/master_key.bin:/run/secrets/master_key.bin:ro
+      - ./certs:/app/certs:ro
+    ports:
+      - "9000:9000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - ai-soc-network
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ai-soc-frontend
+    depends_on:
+      - ai-soc
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - ai-soc-network
+    restart: unless-stopped
+
+# ==========================================================================
+# Volumes
+# ==========================================================================
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  zookeeper_data:
+    driver: local
+  zookeeper_logs:
+    driver: local
+  kafka_data:
+    driver: local
+  minio_data:
+    driver: local
+  vault_data:
+    driver: local
+  vault_logs:
+    driver: local
+
+# ==========================================================================
+# Networks
+# ==========================================================================
+networks:
+  ai-soc-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16

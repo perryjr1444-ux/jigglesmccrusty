@@ -9,3 +9,24 @@ dist
 .env
 pnpm-lock.yaml
 yarn.lock
+
+# Bootstrap-generated files
+secrets/
+certs/
+data/
+
+# Docker volumes
+postgres_data/
+redis_data/
+kafka_data/
+minio_data/
+vault_data/
+
+# Docker override (local development)
+docker-compose.override.yml
+
+# Backups
+backups/
+*.sql
+*.sql.gz
+*.tar.gz
