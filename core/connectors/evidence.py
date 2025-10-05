@@ -11,7 +11,7 @@ import aiofiles
 import os
 from typing import Optional
 from utils.hasher import sha256_file
-from core.models import Artifact
+from core.models import Artifact, CustodyEntry
 
 
 logger = logging.getLogger(__name__)
