@@ -1,0 +1,84 @@
+# ============================================================================
+# Docker Compose Override Example
+# ============================================================================
+# Copy this file to docker-compose.override.yml and customize for your needs
+# This file is ignored by git and used for local development overrides
+# ============================================================================
+
+version: '3.8'
+
+services:
+  # Development override for AI SOC service
+  ai-soc:
+    # Mount source code for live reload during development
+    volumes:
+      - ./ai_soc/ai_soc:/app/ai_soc:ro
+    environment:
+      # Enable debug mode
+      LOG_LEVEL: DEBUG
+    # Override command for development with auto-reload
+    command: uvicorn ai_soc.main:app --host 0.0.0.0 --port 9000 --reload
+
+  # Development override for frontend
+  frontend:
+    # For development, you might want to run the frontend differently
+    # Comment out the build section and use the dev server instead
+    ports:
+      - "8000:8000"
+      - "5173:5173"  # Vite dev server
+
+  # Additional development services
+  # Uncomment these if you need them for local development
+
+  # pgadmin:
+  #   image: dpage/pgadmin4:latest
+  #   container_name: ai-soc-pgadmin
+  #   environment:
+  #     PGADMIN_DEFAULT_EMAIL: admin@local.dev
+  #     PGADMIN_DEFAULT_PASSWORD: admin
+  #   ports:
+  #     - "5050:80"
+  #   networks:
+  #     - ai-soc-network
+
+  # kafka-ui:
+  #   image: provectuslabs/kafka-ui:latest
+  #   container_name: ai-soc-kafka-ui
+  #   depends_on:
+  #     - kafka
+  #   environment:
+  #     KAFKA_CLUSTERS_0_NAME: local
+  #     KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+  #   ports:
+  #     - "8080:8080"
+  #   networks:
+  #     - ai-soc-network
+
+  # elasticsearch:
+  #   image: elasticsearch:8.11.0
+  #   container_name: ai-soc-elasticsearch
+  #   environment:
+  #     - discovery.type=single-node
+  #     - xpack.security.enabled=false
+  #     - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+  #   ports:
+  #     - "9200:9200"
+  #   volumes:
+  #     - elasticsearch_data:/usr/share/elasticsearch/data
+  #   networks:
+  #     - ai-soc-network
+
+  # kibana:
+  #   image: kibana:8.11.0
+  #   container_name: ai-soc-kibana
+  #   depends_on:
+  #     - elasticsearch
+  #   environment:
+  #     ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+  #   ports:
+  #     - "5601:5601"
+  #   networks:
+  #     - ai-soc-network
+
+# volumes:
+#   elasticsearch_data:
