@@ -2,7 +2,7 @@ import uuid
 import datetime
 import aiofiles
 from utils.hasher import sha256_file
-from core.models import Artifact
+from core.models import Artifact, CustodyEntry
 
 
 class EvidenceConnector:
@@ -40,7 +40,7 @@ class EvidenceConnector:
             s3_path=f"s3://evidence/{key}",
             redaction_map={},  # filled later by the redactor if needed
             custody_chain=[
-                {"actor": "EvidenceClerk", "action": "create", "ts": datetime.datetime.utcnow()}
+                CustodyEntry(actor="EvidenceClerk", action="create")
             ],
         )
-        return {"artifact": artifact.dict(), "summary": f"Captured {kind} → {key}"}
+        return {"artifact": artifact.model_dump(), "summary": f"Captured {kind} → {key}"}
