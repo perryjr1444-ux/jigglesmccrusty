@@ -1,0 +1,75 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-backdrop text-gray-100 font-sans min-h-screen;
+  background-image: theme('backgroundImage.mesh');
+  background-attachment: fixed;
+}
+
+.scrollbar-hidden::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hidden {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.card-sheen::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg, transparent 0%, rgba(255, 255, 255, 0.04) 40%, rgba(123, 110, 255, 0.12) 60%, transparent 100%);
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  pointer-events: none;
+}
+
+.card-sheen:hover::after {
+  opacity: 1;
+}
+
+.glass-panel {
+  background: rgba(17, 21, 43, 0.75);
+  backdrop-filter: blur(18px);
+  border: 1px solid rgba(123, 110, 255, 0.12);
+}
+
+@keyframes metricPulse {
+  0% {
+    transform: translateY(10px);
+    opacity: 0;
+  }
+  60% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.metric-pulse {
+  animation: metricPulse 0.9s ease forwards;
+}
+
+@keyframes fadeSlideUp {
+  0% {
+    transform: translateY(14px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.fade-slide-up {
+  animation: fadeSlideUp 0.7s ease forwards;
+}
