@@ -1,4 +1,7 @@
 .venv/
 __pycache__/
 *.pyc
-data/*.json
+.pytest_cache/
+secrets/
+var/
+*.log

@@ -1,0 +1,31 @@
+[tool.poetry]
+name = "mac-blue-team-framework"
+version = "0.1.0"
+description = "Modular macOS blue-team automation framework"
+authors = ["Security Automation <security@example.com>"]
+readme = "README.md"
+packages = [
+  { include = "api" },
+  { include = "agents" },
+  { include = "connectors" },
+  { include = "core" },
+  { include = "utils" }
+]
+
+[tool.poetry.dependencies]
+python = "^3.12"
+fastapi = "^0.111.0"
+uvicorn = { extras = ["standard"], version = "^0.30.0" }
+pydantic = "^2.7.0"
+python-dotenv = "^1.0.1"
+pyyaml = "^6.0.1"
+cryptography = "^42.0.7"
+httpx = "^0.27.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.2.0"
+ruff = "^0.4.1"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
