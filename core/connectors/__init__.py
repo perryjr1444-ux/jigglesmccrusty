@@ -2,6 +2,7 @@ from .gmail import GmailConnector
 from .msgraph import MSGraphConnector
 from .router import RouterConnector
 from .evidence import EvidenceConnector
+from .vault import VaultConnector
 
 
 class ConnectorRegistry:
