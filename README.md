@@ -4,6 +4,22 @@ This repository captures a modular, hierarchical architecture for an AI-augmente
 
 ---
 
+## Quick Start
+
+Get the entire stack running in minutes with Docker:
+
+```bash
+# One-command deployment
+./scripts/quick-start.sh
+
+# Or use Make for more control
+make deploy
+```
+
+For detailed deployment instructions, configuration options, and troubleshooting, see **[DEPLOYMENT.md](DEPLOYMENT.md)**.
+
+---
+
 ## AI SOC Layers and How They Defend Your Devices
 
 | AI SOC Layer | Core Function | How It Protects Your Devices |

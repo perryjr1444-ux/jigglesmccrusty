@@ -1,0 +1,65 @@
+# Git
+.git
+.gitignore
+.github
+
+# Documentation
+*.md
+docs/
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# Dependencies
+node_modules
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Build artifacts
+dist
+build
+*.egg-info
+.pytest_cache
+.coverage
+coverage/
+
+# Secrets and certificates
+secrets/
+certs/
+*.key
+*.pem
+*.crt
+
+# Data
+data/
+*.db
+*.sqlite
+
+# Logs
+logs/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Docker
+docker-compose.override.yml
+Dockerfile.dev
