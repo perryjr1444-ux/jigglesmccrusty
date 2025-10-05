@@ -1,0 +1,81 @@
+id: device_compromise_v1
+description: Contain a compromised macOS device, isolate it, and perform forensic collection.
+severity: critical
+tags: [device, endpoint, compromise, forensics]
+
+tasks:
+  detect_anomaly:
+    type: DetectAnomaly
+    inputs:
+      device_id: "{{device_id}}"
+      osquery_log: "{{osquery_log_path}}"
+    needs: []
+    approval_required: false
+    idempotency_key: "detect-{{device_id}}"
+
+  network_isolate:
+    type: NetworkIsolate
+    inputs:
+      device_id: "{{device_id}}"
+      vlan_id: "{{quarantine_vlan}}"
+    needs: [detect_anomaly]
+    approval_required: true
+    idempotency_key: "isolate-{{device_id}}"
+
+  collect_forensics:
+    type: CollectForensics
+    inputs:
+      device_id: "{{device_id}}"
+      case_id: "{{case_id}}"
+      artifacts: ["memory", "disk", "logs"]
+    needs: [network_isolate]
+    approval_required: false
+    idempotency_key: "forensics-{{device_id}}-{{case_id}}"
+
+  terminate_processes:
+    type: TerminateProcesses
+    inputs:
+      device_id: "{{device_id}}"
+      process_ids: "{{detect_anomaly.output.malicious_pids}}"
+    needs: [detect_anomaly]
+    approval_required: true
+    idempotency_key: "kill-procs-{{device_id}}"
+
+  block_c2_domains:
+    type: BlockDomains
+    inputs:
+      domains: "{{detect_anomaly.output.c2_domains}}"
+      scope: "organization"
+    needs: [detect_anomaly]
+    approval_required: false
+    idempotency_key: "block-c2-{{case_id}}"
+
+  revoke_device_credentials:
+    type: RevokeCredentials
+    inputs:
+      device_id: "{{device_id}}"
+      credential_types: ["oauth", "certificates", "vpn"]
+    needs: [network_isolate]
+    approval_required: true
+    idempotency_key: "revoke-creds-{{device_id}}"
+
+  create_incident_report:
+    type: CreateIncidentReport
+    inputs:
+      case_id: "{{case_id}}"
+      device_id: "{{device_id}}"
+      findings: "{{collect_forensics.output.summary}}"
+      indicators: "{{detect_anomaly.output.iocs}}"
+    needs: [collect_forensics, terminate_processes, block_c2_domains]
+    approval_required: false
+    idempotency_key: "report-{{case_id}}"
+
+  notify_security_team:
+    type: NotifyTeam
+    inputs:
+      channel: "{{notification_channel}}"
+      severity: "critical"
+      message: "Device {{device_id}} compromised. Incident {{case_id}} created."
+      report_url: "{{create_incident_report.output.report_url}}"
+    needs: [create_incident_report]
+    approval_required: false

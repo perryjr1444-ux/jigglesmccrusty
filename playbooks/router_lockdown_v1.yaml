@@ -1,0 +1,92 @@
+id: router_lockdown_v1
+description: Harden a compromised or vulnerable network router with emergency lockdown procedures.
+severity: high
+tags: [network, router, infrastructure, hardening]
+
+tasks:
+  backup_config:
+    type: BackupRouterConfig
+    inputs:
+      router_ip: "{{router_ip}}"
+      case_id: "{{case_id}}"
+      backup_location: "/tmp/router_backup_{{router_ip}}_{{case_id}}.cfg"
+    needs: []
+    approval_required: false
+    idempotency_key: "backup-{{router_ip}}-{{case_id}}"
+
+  disable_remote_access:
+    type: DisableRouterService
+    inputs:
+      router_ip: "{{router_ip}}"
+      services: ["telnet", "http", "ssh_external"]
+    needs: [backup_config]
+    approval_required: true
+    idempotency_key: "disable-remote-{{router_ip}}"
+
+  change_admin_password:
+    type: ChangeRouterPassword
+    inputs:
+      router_ip: "{{router_ip}}"
+      new_password_enc: "{{new_admin_password_enc}}"
+    needs: [backup_config]
+    approval_required: true
+    idempotency_key: "pwd-{{router_ip}}"
+
+  update_firmware:
+    type: UpdateRouterFirmware
+    inputs:
+      router_ip: "{{router_ip}}"
+      firmware_url: "{{firmware_update_url}}"
+      verify_checksum: true
+    needs: [disable_remote_access, change_admin_password]
+    approval_required: true
+    idempotency_key: "firmware-{{router_ip}}"
+
+  apply_acl_rules:
+    type: ApplyACL
+    inputs:
+      router_ip: "{{router_ip}}"
+      rules: "{{acl_rules}}"
+      direction: "inbound"
+    needs: [change_admin_password]
+    approval_required: false
+    idempotency_key: "acl-{{router_ip}}-{{case_id}}"
+
+  enable_logging:
+    type: EnableRouterLogging
+    inputs:
+      router_ip: "{{router_ip}}"
+      syslog_server: "{{syslog_server}}"
+      log_level: "informational"
+    needs: [apply_acl_rules]
+    approval_required: false
+    idempotency_key: "logging-{{router_ip}}"
+
+  scan_vulnerabilities:
+    type: ScanRouter
+    inputs:
+      router_ip: "{{router_ip}}"
+      scan_type: "authenticated"
+    needs: [update_firmware]
+    approval_required: false
+    idempotency_key: "scan-{{router_ip}}-{{case_id}}"
+
+  verify_hardening:
+    type: VerifyHardening
+    inputs:
+      router_ip: "{{router_ip}}"
+      baseline_checklist: "{{hardening_checklist}}"
+      scan_results: "{{scan_vulnerabilities.output.findings}}"
+    needs: [scan_vulnerabilities, enable_logging]
+    approval_required: false
+    idempotency_key: "verify-{{router_ip}}-{{case_id}}"
+
+  document_changes:
+    type: DocumentChanges
+    inputs:
+      case_id: "{{case_id}}"
+      router_ip: "{{router_ip}}"
+      changes: "{{verify_hardening.output.changes_applied}}"
+      timestamp: "{{backup_config.output.timestamp}}"
+    needs: [verify_hardening]
+    approval_required: false
