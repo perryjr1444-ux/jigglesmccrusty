@@ -1,0 +1,24 @@
+id: router_lockdown
+name: Home Router Lockdown
+description: Reset and harden a residential router after suspected compromise.
+entry: notify
+nodes:
+  notify:
+    name: Carrier Port-Out Lock
+    description: Engage the carrier lock to block SIM swapping.
+    agent: network_steward
+    action: lock_carrier_port_out
+    next: [reset]
+  reset:
+    name: Router Reset
+    description: Perform a factory reset and apply hardened configuration.
+    agent: network_steward
+    action: reset_router
+    requires_approval: true
+    next: [coach]
+  coach:
+    name: Hardening Coach
+    description: Provide user training and baseline recommendations.
+    agent: hardening_coach
+    action: recommend_baselines
+    next: []

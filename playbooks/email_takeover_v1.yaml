@@ -1,0 +1,31 @@
+id: email_takeover_v1
+name: Email Takeover Containment v1
+description: Respond to suspicious mailbox forwarding and secure the identity.
+entry: intake
+nodes:
+  intake:
+    name: Collect Evidence
+    description: Capture mailbox rules and suspicious forwards.
+    agent: evidence_clerk
+    action: collect_mailbox_evidence
+    next: [secure_account]
+  secure_account:
+    name: Secure Account Controls
+    description: Disable malicious forwarding and revoke sessions.
+    agent: identity_locker
+    action: enforce_account_controls
+    requires_approval: true
+    next: [rotate_creds]
+  rotate_creds:
+    name: Rotate Credentials
+    description: Reset password and rotate app passwords.
+    agent: identity_locker
+    action: rotate_credentials
+    requires_approval: true
+    next: [report_status]
+  report_status:
+    name: Executive Report
+    description: Summarise containment results for leadership.
+    agent: platform_reporter
+    action: compile_status_report
+    next: []

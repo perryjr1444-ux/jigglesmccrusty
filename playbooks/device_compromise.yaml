@@ -1,0 +1,36 @@
+id: device_compromise
+name: Device Compromise Response
+description: Isolate the endpoint, capture evidence, and schedule remediation.
+entry: detect
+nodes:
+  detect:
+    name: Summarise Alert
+    description: Record the triggering alert details.
+    agent: evidence_clerk
+    action: summarize_alert
+    next: [quarantine]
+  quarantine:
+    name: Quarantine Device
+    description: Isolate network access and preserve state.
+    agent: device_remediator
+    action: quarantine_device
+    requires_approval: true
+    next: [collect]
+  collect:
+    name: Collect Forensics
+    description: Gather forensic artifacts for investigation.
+    agent: device_remediator
+    action: collect_forensics
+    next: [patch]
+  patch:
+    name: Schedule Patch Window
+    description: Apply security updates once investigation completes.
+    agent: device_remediator
+    action: schedule_patch
+    next: [brief]
+  brief:
+    name: Device Brief
+    description: Summarise device status for stakeholders.
+    agent: platform_reporter
+    action: generate_device_brief
+    next: []
