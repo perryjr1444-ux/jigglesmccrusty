@@ -12,6 +12,8 @@ class Commander:
 
     def __init__(self, playbook_dir: Path):
         self.dir = playbook_dir
+        # Use StrictUndefined to catch errors in rendering, but handle them gracefully
+        # to preserve task references like {{task_name.output.field}}
         self.jinja_env = jinja2.Environment(undefined=jinja2.StrictUndefined)
 
     def load(self, playbook_id: str, context: dict) -> dict:
@@ -22,13 +24,22 @@ class Commander:
         rendered = self._render_recursive(raw, context)
 
         # Basic sanity checks
-        tasks = rendered["tasks"]
-        if len(tasks) != len(set(tasks)):
+        tasks = rendered.get("tasks", {})
+        if isinstance(tasks, dict):
+            task_names = list(tasks.keys())
+        else:
+            task_names = tasks
+        
+        # Validate task uniqueness
+        if len(task_names) != len(set(task_names)):
             raise ValueError("Duplicate task names in playbook")
 
         # Return a compact dict the orchestrator expects
         return {
-            "playbook_id": playbook_id,
+            "playbook_id": rendered.get("id", playbook_id),
+            "description": rendered.get("description", ""),
+            "severity": rendered.get("severity", "medium"),
+            "tags": rendered.get("tags", []),
             "tasks": tasks,
         }
 
@@ -38,6 +49,10 @@ class Commander:
         if isinstance(obj, list):
             return [self._render_recursive(i, ctx) for i in obj]
         if isinstance(obj, str):
-            tmpl = self.jinja_env.from_string(obj)
-            return tmpl.render(**ctx)
+            try:
+                tmpl = self.jinja_env.from_string(obj)
+                return tmpl.render(**ctx)
+            except jinja2.UndefinedError:
+                # Preserve template strings with undefined variables (e.g., task references)
+                return obj
         return obj
